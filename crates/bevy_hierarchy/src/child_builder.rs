@@ -84,6 +84,21 @@ fn remove_children(parent: Entity, children: &[Entity], world: &mut World) {
     }
 }
 
+fn clear_children(parent: Entity, world: &mut World) {
+    if let Some(children) = world.get::<Children>(parent).map(|c| c.0.clone()) {
+        let mut events: SmallVec<[HierarchyEvent; 8]> = SmallVec::new();
+        for child in children {
+            world.entity_mut(child).remove::<Parent>();
+            events.push(HierarchyEvent::ChildRemoved {
+                child: child,
+                parent,
+            });
+        }
+        push_events(world, events);
+        world.entity_mut(parent).remove::<Children>();
+    }
+}
+
 /// Command that adds a child to an entity
 #[derive(Debug)]
 pub struct AddChild {
@@ -178,6 +193,17 @@ impl Command for RemoveChildren {
     }
 }
 
+/// Command that removes all children from an entity
+pub struct ClearChildren {
+    parent: Entity,
+}
+
+impl Command for ClearChildren {
+    fn write(self, world: &mut World) {
+        clear_children(self.parent, world);
+    }
+}
+
 /// Struct for building children onto an entity
 pub struct ChildBuilder<'w, 's, 'a> {
     commands: &'a mut Commands<'w, 's>,
@@ -256,6 +282,8 @@ pub trait BuildChildren {
     fn remove_children(&mut self, children: &[Entity]) -> &mut Self;
     /// Adds a single child
     fn add_child(&mut self, child: Entity) -> &mut Self;
+    /// Removes all children
+    fn clear_children(&mut self) -> &mut Self;
 }
 
 impl<'w, 's, 'a> BuildChildren for EntityCommands<'w, 's, 'a> {
@@ -312,6 +340,12 @@ impl<'w, 's, 'a> BuildChildren for EntityCommands<'w, 's, 'a> {
     fn add_child(&mut self, child: Entity) -> &mut Self {
         let parent = self.id();
         self.commands().add(AddChild { child, parent });
+        self
+    }
+
+    fn clear_children(&mut self) -> &mut Self {
+        let parent = self.id();
+        self.commands().add(ClearChildren { parent });
         self
     }
 }
@@ -379,6 +413,8 @@ pub trait BuildWorldChildren {
     fn insert_children(&mut self, index: usize, children: &[Entity]) -> &mut Self;
     /// Removes the given children
     fn remove_children(&mut self, children: &[Entity]) -> &mut Self;
+    /// Removes all children
+    fn clear_children(&mut self) -> &mut Self;
 }
 
 impl<'w> BuildWorldChildren for EntityMut<'w> {
@@ -447,6 +483,14 @@ impl<'w> BuildWorldChildren for EntityMut<'w> {
         remove_children(parent, children, world);
         self
     }
+
+    fn clear_children(&mut self) -> &mut Self {
+        let parent = self.id();
+        // SAFETY: This doesn't change the parent's location
+        let world = unsafe { self.world_mut() };
+        clear_children(parent, world);
+        self
+    }
 }
 
 impl<'w> BuildWorldChildren for WorldChildBuilder<'w> {
@@ -508,6 +552,15 @@ impl<'w> BuildWorldChildren for WorldChildBuilder<'w> {
             .expect("Cannot remove children without a parent. Try creating an entity first.");
 
         remove_children(parent, children, self.world);
+        self
+    }
+
+    fn clear_children(&mut self) -> &mut Self {
+        let parent = self
+            .current_entity
+            .expect("Cannot clear children without a parent. Try creating an entity first.");
+
+        clear_children(parent, self.world);
         self
     }
 }
