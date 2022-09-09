@@ -99,6 +99,22 @@ fn clear_children(parent: Entity, world: &mut World) {
     }
 }
 
+fn replace_children(parent: Entity, children: &[Entity], world: &mut World) {
+    clear_children(parent, world);
+    let mut events: SmallVec<[HierarchyEvent; 8]> = SmallVec::new();
+    for child in children {
+        world.entity_mut(*child).insert(Parent(parent));
+        events.push(HierarchyEvent::ChildAdded {
+            child: *child,
+            parent,
+        });
+    }
+    push_events(world, events);
+    world
+        .entity_mut(parent)
+        .insert(Children(children.to_vec().into()));
+}
+
 /// Command that adds a child to an entity
 #[derive(Debug)]
 pub struct AddChild {
@@ -204,6 +220,18 @@ impl Command for ClearChildren {
     }
 }
 
+/// Command that removes existing children from an entity and replaces them with new children
+pub struct ReplaceChildren {
+    parent: Entity,
+    children: SmallVec<[Entity; 8]>,
+}
+
+impl Command for ReplaceChildren {
+    fn write(self, world: &mut World) {
+        replace_children(self.parent, &self.children, world);
+    }
+}
+
 /// Struct for building children onto an entity
 pub struct ChildBuilder<'w, 's, 'a> {
     commands: &'a mut Commands<'w, 's>,
@@ -284,6 +312,8 @@ pub trait BuildChildren {
     fn add_child(&mut self, child: Entity) -> &mut Self;
     /// Removes all children
     fn clear_children(&mut self) -> &mut Self;
+    /// Replaces all children with the given children
+    fn replace_children(&mut self, children: &[Entity]) -> &mut Self;
 }
 
 impl<'w, 's, 'a> BuildChildren for EntityCommands<'w, 's, 'a> {
@@ -346,6 +376,15 @@ impl<'w, 's, 'a> BuildChildren for EntityCommands<'w, 's, 'a> {
     fn clear_children(&mut self) -> &mut Self {
         let parent = self.id();
         self.commands().add(ClearChildren { parent });
+        self
+    }
+
+    fn replace_children(&mut self, children: &[Entity]) -> &mut Self {
+        let parent = self.id();
+        self.commands().add(ReplaceChildren {
+            children: SmallVec::from(children),
+            parent,
+        });
         self
     }
 }
@@ -415,6 +454,8 @@ pub trait BuildWorldChildren {
     fn remove_children(&mut self, children: &[Entity]) -> &mut Self;
     /// Removes all children
     fn clear_children(&mut self) -> &mut Self;
+    /// Replaces all children with the given children
+    fn replace_children(&mut self, children: &[Entity]) -> &mut Self;
 }
 
 impl<'w> BuildWorldChildren for EntityMut<'w> {
@@ -491,6 +532,24 @@ impl<'w> BuildWorldChildren for EntityMut<'w> {
         clear_children(parent, world);
         self
     }
+
+    fn replace_children(&mut self, children: &[Entity]) -> &mut Self {
+        let parent = self.id();
+        {
+            // SAFETY: parent entity is not modified and its location is updated manually
+            let world = unsafe { self.world_mut() };
+            update_old_parents(world, parent, children);
+            // Inserting a bundle in the children entities may change the parent entity's location if they were of the same archetype
+            self.update_location();
+        }
+        if let Some(mut children_component) = self.get_mut::<Children>() {
+            children_component.0.clear();
+            children_component.0.extend(children.iter().cloned());
+        } else {
+            self.insert(Children::from_entities(children));
+        }
+        self
+    }
 }
 
 impl<'w> BuildWorldChildren for WorldChildBuilder<'w> {
@@ -561,6 +620,22 @@ impl<'w> BuildWorldChildren for WorldChildBuilder<'w> {
             .expect("Cannot clear children without a parent. Try creating an entity first.");
 
         clear_children(parent, self.world);
+        self
+    }
+
+    fn replace_children(&mut self, children: &[Entity]) -> &mut Self {
+        let parent = self
+            .current_entity
+            .expect("Cannot replace children without a parent. Try creating an entity first.");
+        update_old_parents(self.world, parent, children);
+        if let Some(mut children_component) = self.world.get_mut::<Children>(parent) {
+            children_component.0.clear();
+            children_component.0.extend(children.iter().cloned());
+        } else {
+            self.world
+                .entity_mut(parent)
+                .insert(Children::from_entities(children));
+        }
         self
     }
 }
