@@ -198,6 +198,7 @@ impl Command for PushChildren {
 }
 
 /// Command that removes children from an entity, and removes that child's parent and inserts it into the previous parent component
+#[derive(Debug)]
 pub struct RemoveChildren {
     parent: Entity,
     children: SmallVec<[Entity; 8]>,
@@ -210,6 +211,7 @@ impl Command for RemoveChildren {
 }
 
 /// Command that removes all children from an entity
+#[derive(Debug)]
 pub struct ClearChildren {
     parent: Entity,
 }
@@ -221,6 +223,7 @@ impl Command for ClearChildren {
 }
 
 /// Command that removes existing children from an entity and replaces them with new children
+#[derive(Debug)]
 pub struct ReplaceChildren {
     parent: Entity,
     children: SmallVec<[Entity; 8]>,
