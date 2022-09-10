@@ -748,6 +748,89 @@ mod tests {
     }
 
     #[test]
+    fn clear_and_replace_children_commands() {
+        let mut world = World::default();
+        let entities = world
+            .spawn_batch(vec![(C(1),), (C(2),), (C(3),), (C(4),), (C(5),)])
+            .collect::<Vec<Entity>>();
+
+        let mut queue = CommandQueue::default();
+        {
+            let mut commands = Commands::new(&mut queue, &world);
+            commands.entity(entities[0]).push_children(&entities[1..3]);
+        }
+        queue.apply(&mut world);
+
+        let parent = entities[0];
+        let child1 = entities[1];
+        let child2 = entities[2];
+        let child3 = entities[3];
+        let child4 = entities[4];
+
+        let expected_children: SmallVec<[Entity; 8]> = smallvec![child1, child2];
+        assert_eq!(
+            world.get::<Children>(parent).unwrap().0.clone(),
+            expected_children
+        );
+        assert_eq!(*world.get::<Parent>(child1).unwrap(), Parent(parent));
+        assert_eq!(*world.get::<Parent>(child2).unwrap(), Parent(parent));
+
+        assert_eq!(*world.get::<Parent>(child1).unwrap(), Parent(parent));
+        assert_eq!(*world.get::<Parent>(child2).unwrap(), Parent(parent));
+
+        // Replace
+
+        let new_entities = world
+            .spawn_batch(vec![(C(6),), (C(7),), (C(8),), (C(9),)])
+            .collect::<Vec<Entity>>();
+
+        {
+            let mut commands = Commands::new(&mut queue, &world);
+            commands.entity(parent).replace_children(&new_entities);
+        }
+        queue.apply(&mut world);
+
+        let child5 = new_entities[0];
+        let child6 = new_entities[1];
+        let child7 = new_entities[2];
+        let child8 = new_entities[3];
+        
+        let expected_children: SmallVec<[Entity; 8]> = smallvec![child5, child6, child7, child8];
+        assert_eq!(
+            world.get::<Children>(parent).unwrap().0.clone(),
+            expected_children
+        );
+        assert_eq!(*world.get::<Parent>(child5).unwrap(), Parent(parent));
+        assert_eq!(*world.get::<Parent>(child6).unwrap(), Parent(parent));
+
+        assert_eq!(*world.get::<Parent>(child7).unwrap(), Parent(parent));
+        assert_eq!(*world.get::<Parent>(child8).unwrap(), Parent(parent));
+
+        assert!(world.get::<Parent>(child1).is_none());
+        assert!(world.get::<Parent>(child2).is_none());
+
+        assert!(world.get::<Parent>(child3).is_none());
+        assert!(world.get::<Parent>(child4).is_none());
+
+        // Clear
+
+        {
+            let mut commands = Commands::new(&mut queue, &world);
+            commands.entity(parent).clear_children();
+        }
+        queue.apply(&mut world);
+
+        assert!(world.get::<Children>(parent).is_none());
+
+        assert!(world.get::<Parent>(child5).is_none());
+        assert!(world.get::<Parent>(child6).is_none());
+
+        assert!(world.get::<Parent>(child7).is_none());
+        assert!(world.get::<Parent>(child8).is_none());
+
+    }
+
+    #[test]
     fn push_and_insert_and_remove_children_world() {
         let mut world = World::default();
         let entities = world
