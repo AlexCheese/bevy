@@ -757,7 +757,7 @@ mod tests {
         let mut queue = CommandQueue::default();
         {
             let mut commands = Commands::new(&mut queue, &world);
-            commands.entity(entities[0]).push_children(&entities[1..3]);
+            commands.entity(entities[0]).push_children(&entities[1..]);
         }
         queue.apply(&mut world);
 
@@ -767,16 +767,15 @@ mod tests {
         let child3 = entities[3];
         let child4 = entities[4];
 
-        let expected_children: SmallVec<[Entity; 8]> = smallvec![child1, child2];
+        let expected_children: SmallVec<[Entity; 8]> = smallvec![child1, child2, child3, child4];
         assert_eq!(
             world.get::<Children>(parent).unwrap().0.clone(),
             expected_children
         );
         assert_eq!(*world.get::<Parent>(child1).unwrap(), Parent(parent));
         assert_eq!(*world.get::<Parent>(child2).unwrap(), Parent(parent));
-
-        assert_eq!(*world.get::<Parent>(child1).unwrap(), Parent(parent));
-        assert_eq!(*world.get::<Parent>(child2).unwrap(), Parent(parent));
+        assert_eq!(*world.get::<Parent>(child3).unwrap(), Parent(parent));
+        assert_eq!(*world.get::<Parent>(child4).unwrap(), Parent(parent));
 
         // Replace
 
@@ -802,13 +801,11 @@ mod tests {
         );
         assert_eq!(*world.get::<Parent>(child5).unwrap(), Parent(parent));
         assert_eq!(*world.get::<Parent>(child6).unwrap(), Parent(parent));
-
         assert_eq!(*world.get::<Parent>(child7).unwrap(), Parent(parent));
         assert_eq!(*world.get::<Parent>(child8).unwrap(), Parent(parent));
 
         assert!(world.get::<Parent>(child1).is_none());
         assert!(world.get::<Parent>(child2).is_none());
-
         assert!(world.get::<Parent>(child3).is_none());
         assert!(world.get::<Parent>(child4).is_none());
 
@@ -824,7 +821,6 @@ mod tests {
 
         assert!(world.get::<Parent>(child5).is_none());
         assert!(world.get::<Parent>(child6).is_none());
-
         assert!(world.get::<Parent>(child7).is_none());
         assert!(world.get::<Parent>(child8).is_none());
 
