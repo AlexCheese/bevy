@@ -543,14 +543,9 @@ impl<'w> BuildWorldChildren for EntityMut<'w> {
             let world = unsafe { self.world_mut() };
             update_old_parents(world, parent, children);
             // Inserting a bundle in the children entities may change the parent entity's location if they were of the same archetype
-            self.update_location();
+            replace_children(parent, children, world);
         }
-        if let Some(mut children_component) = self.get_mut::<Children>() {
-            children_component.0.clear();
-            children_component.0.extend(children.iter().cloned());
-        } else {
-            self.insert(Children::from_entities(children));
-        }
+        self.update_location();
         self
     }
 }
