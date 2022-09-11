@@ -89,10 +89,7 @@ fn clear_children(parent: Entity, world: &mut World) {
         let mut events: SmallVec<[HierarchyEvent; 8]> = SmallVec::new();
         for child in children {
             world.entity_mut(child).remove::<Parent>();
-            events.push(HierarchyEvent::ChildRemoved {
-                child: child,
-                parent,
-            });
+            events.push(HierarchyEvent::ChildRemoved { child, parent });
         }
         push_events(world, events);
         world.entity_mut(parent).remove::<Children>();
@@ -786,7 +783,7 @@ mod tests {
         let child6 = new_entities[1];
         let child7 = new_entities[2];
         let child8 = new_entities[3];
-        
+
         let expected_children: SmallVec<[Entity; 8]> = smallvec![child5, child6, child7, child8];
         assert_eq!(
             world.get::<Children>(parent).unwrap().0.clone(),
@@ -814,7 +811,6 @@ mod tests {
         assert!(world.get::<Parent>(child6).is_none());
         assert!(world.get::<Parent>(child7).is_none());
         assert!(world.get::<Parent>(child8).is_none());
-
     }
 
     #[test]
@@ -886,8 +882,8 @@ mod tests {
         assert_eq!(*world.get::<Parent>(child4).unwrap(), Parent(parent));
 
         let new_entities = world
-        .spawn_batch(vec![(C(6),), (C(7),), (C(8),), (C(9),)])
-        .collect::<Vec<Entity>>();
+            .spawn_batch(vec![(C(6),), (C(7),), (C(8),), (C(9),)])
+            .collect::<Vec<Entity>>();
 
         world.entity_mut(parent).replace_children(&new_entities);
 
