@@ -622,15 +622,7 @@ impl<'w> BuildWorldChildren for WorldChildBuilder<'w> {
         let parent = self
             .current_entity
             .expect("Cannot replace children without a parent. Try creating an entity first.");
-        update_old_parents(self.world, parent, children);
-        if let Some(mut children_component) = self.world.get_mut::<Children>(parent) {
-            children_component.0.clear();
-            children_component.0.extend(children.iter().cloned());
-        } else {
-            self.world
-                .entity_mut(parent)
-                .insert(Children::from_entities(children));
-        }
+        replace_children(parent, children, self.world);
         self
     }
 }
